@@ -1,0 +1,502 @@
+Библиотеки
+Build.gradle.kts
+id("kotlin-kapt")
+
+implementation("androidx.room:room-runtime:2.6.1")
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.androidx.navigation.ui.ktx)
+    kapt("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+
+Libs.versions.toml
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+androidx-navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigationFragmentKtx" }
+androidx-navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigationUiKtx" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+
+/*Добавление нового MainActivity
+<activity
+            android:name=".MainActivityData"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.MyApplication2" />
+
+User
+package com.example.myapplication2
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "users")
+data class User (
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val username: String,
+    val password: String
+)
+
+UserDao
+package com.example.myapplication2
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
+
+@Dao
+interface UserDao {
+    @Insert
+    suspend fun insert(user: User)
+
+    @Query("SELECT * FROM users WHERE username = :username AND password = :password")
+    suspend fun getUser(username: String, password: String): User?
+
+    @Query("SELECT * FROM users WHERE id = :id")
+    suspend fun getIdUser(id: Int): User?
+
+    @Query("SELECT * FROM users")
+    suspend fun getAllUser(): List<User>
+}
+
+ImportData
+package com.example.myapplication2
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "importData")
+data class ImportData (
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val startCity: String,
+    val startCityCod: String,
+    val endCity: String,
+    val endCityCod: String,
+    val startDate: String,
+    val endDate: String,
+    val price: Int,
+    val searchToken: String
+)
+
+ImportDataDao
+package com.example.myapplication2
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
+import com.example.myapplication2.FavoriteItem
+import com.example.myapplication2.ImportData
+
+@Dao
+interface ImportDataDao {
+    @Insert
+    suspend fun insert(importData: ImportData)
+
+    @Query("SELECT * From importData WHERE id = :id")
+    suspend fun getDataByUser(id: Int): ImportData?
+
+    @Query("SELECT * From importData")
+    suspend fun getAllData(): List<ImportData>
+}
+
+FavoriteItem
+package com.example.myapplication2
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "favoriteItem")
+data class FavoriteItem (
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val userId: Int,
+    val itemName: String,
+    val itemDescription: String
+)
+
+FavoriteDao
+package com.example.myapplication2
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
+
+@Dao
+interface FavoriteDao {
+    @Insert
+    suspend fun insert(favoriteItem: FavoriteItem)
+
+    @Query("SELECT * From favoriteItem WHERE userId = :id")
+    suspend fun getFavoriteItemByUser(id: Int):FavoriteItem?
+
+    @Query("SELECT * From favoriteItem")
+    suspend fun getAllFavoriteItem(): List<FavoriteItem>
+}
+
+AppDatabase
+package com.example.myapplication2
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.Room
+import android.content.Context
+import com.example.myapplication2.ImportDataDao
+
+@Database(entities = [User::class, FavoriteItem::class, ImportData::class], version = 3)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun userDao(): UserDao
+    abstract fun favoriteDao(): FavoriteDao
+    abstract fun importDataDao(): ImportDataDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun getDatabase(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "app_database"
+                ).build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
+}
+
+MainActivity
+package com.example.myapplication2
+
+import android.content.Intent
+import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.lifecycleScope
+import com.example.myapplication2.ui.theme.MyApplication2Theme
+import kotlinx.coroutines.launch
+
+class MainActivity : ComponentActivity() {
+    private lateinit var bd: AppDatabase
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        bd = AppDatabase.getDatabase(this)
+        val loginEditText = findViewById<EditText>(R.id.editTextText)
+        val passwordEditText = findViewById<EditText>(R.id.editTextText2)
+        val button = findViewById<Button>(R.id.button)
+        val buttonReg = findViewById<Button>(R.id.button2)
+
+        button.setOnClickListener() {
+            val login = loginEditText.text.toString()
+            val password = passwordEditText.text.toString()
+
+            lifecycleScope.launch {
+                val user = bd.userDao().getUser(login, password)
+                runOnUiThread {
+                    if (user != null) {
+                        Toast.makeText(this@MainActivity, "Успешно", Toast.LENGTH_SHORT).show()
+
+                        val intent = Intent(this@MainActivity, MainActivityProfile::class.java)
+                        intent.putExtra("ID", user.id.toString())
+                        startActivity(intent)
+                    } else {
+                        Toast.makeText(this@MainActivity, "Неверные данные", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
+        buttonReg.setOnClickListener() {
+            val intent = Intent(this@MainActivity, MainActivityReg::class.java)
+            startActivity(intent)
+        }
+    }
+}
+
+MainActivityReg
+package com.example.myapplication2
+
+import android.content.Intent
+import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+class MainActivityReg : ComponentActivity() {
+    private lateinit var bd: AppDatabase
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main2)
+
+        bd = AppDatabase.getDatabase(this)
+        val loginEditView = findViewById<EditText>(R.id.editTextText3)
+        val passwordEditText = findViewById<EditText>(R.id.editTextText4)
+        val password2EditText = findViewById<EditText>(R.id.editTextText5)
+        val button = findViewById<Button>(R.id.button3)
+
+        button.setOnClickListener() {
+            val login = loginEditView.text.toString()
+            val password = passwordEditText.text.toString()
+            val password2 = password2EditText.text.toString()
+
+            if (password != password2) {
+                Toast.makeText(this@MainActivityReg, "Пароли не совпадают", Toast.LENGTH_SHORT).show()
+            } else if (login != "" && password != "" && password2 != "") {
+                CoroutineScope(Dispatchers.IO).launch {
+                    val user = User(username = login, password = password)
+                    bd.userDao().insert(user)
+                }
+                runOnUiThread {
+                    Toast.makeText(this@MainActivityReg, "Регистрация успешна", Toast.LENGTH_SHORT).show()
+                    val intent = Intent(this@MainActivityReg, MainActivity::class.java)
+                    startActivity(intent)
+                }
+            } else {
+                Toast.makeText(this@MainActivityReg, "Заполните все поля", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+}
+
+MainActivityProfile
+package com.example.myapplication2
+
+import android.content.Intent
+import android.os.Bundle
+import android.widget.Button
+import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+
+class MainActivityProfile : ComponentActivity() {
+    private lateinit var bd: AppDatabase
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main3)
+
+        bd = AppDatabase.getDatabase(this)
+        val userID = (intent.getStringExtra("ID"))
+
+        val IdTextView = findViewById<TextView>(R.id.textView7)
+        val loginTextView = findViewById<TextView>(R.id.textView8)
+        val passwordTextView = findViewById<TextView>(R.id.textView9)
+        val button = findViewById<Button>(R.id.button4)
+        val button2 = findViewById<Button>(R.id.button5)
+
+        if (userID != null) {
+            lifecycleScope.launch {
+                val user = bd.userDao().getIdUser(userID.toString().toInt())
+                IdTextView.text = user?.id.toString()
+                loginTextView.text = user?.username.toString()
+                passwordTextView.text = user?.password.toString()
+            }
+        } else {
+            IdTextView.text = "Ошибка: ID пользователя не получен"
+        }
+
+        button.setOnClickListener() {
+            val intent = Intent(this@MainActivityProfile, MainActivityData::class.java)
+            intent.putExtra("ID", userID)
+            startActivity(intent)
+        }
+
+        button2.setOnClickListener() {
+            val intent = Intent(this@MainActivityProfile, MainActivityFavorite::class.java)
+            intent.putExtra("ID", userID)
+            startActivity(intent)
+        }
+    }
+}
+
+MainActivityData
+package com.example.myapplication2
+
+import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ListView
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+class MainActivityData : ComponentActivity() {
+    private lateinit var bd: AppDatabase
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main4)
+
+        bd = AppDatabase.getDatabase(this)
+        val userID = (intent.getStringExtra("ID"))
+
+        val startCity = findViewById<EditText>(R.id.editTextText6)
+        val startCityCod = findViewById<EditText>(R.id.editTextText7)
+        val endCity= findViewById<EditText>(R.id.editTextText8)
+        val endCityCod = findViewById<EditText>(R.id.editTextText8)
+        val startDate = findViewById<EditText>(R.id.editTextText9)
+        val endDate = findViewById<EditText>(R.id.editTextText10)
+        val price = findViewById<EditText>(R.id.editTextText11)
+        val searchToken = findViewById<EditText>(R.id.editTextText12)
+        val button = findViewById<Button>(R.id.button6)
+        val list = findViewById<ListView>(R.id.listView)
+
+        lifecycleScope.launch {
+            val listData = bd.importDataDao().getDataByUser(userID.toString().toInt())
+            list.adapter = DataAdapter(this@MainActivityData, listData)
+        }
+
+        button.setOnClickListener {
+            val user = userT.text.toString()
+            val name = nameT.text.toString()
+            val des = descT.text.toString()
+
+
+            if (user.isNotEmpty() && name.isNotEmpty() && des.isNotEmpty()) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    val favorite = FavoriteItem(userId = user.toString().toInt(), itemName = name, itemDescription = des)
+                    db.favoriteDao().insert(favorite)
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity4, "Успешно добавлено", Toast.LENGTH_SHORT).show()
+                        lifecycleScope.launch {
+                            val listFavorite = db.favoriteDao().getAllFavorite()
+                            favoriteListView.adapter = FavoriteAdapter(this@MainActivity4, listFavorite)
+                        }
+                    }
+                }
+            } else {
+                Toast.makeText(this, "Заполните все поля", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+}
+
+DataAdapter
+package com.example.myapplication2
+
+import android.content.Context
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
+import android.widget.TextView
+
+class DataAdapter (
+    private val context: Context,
+    private val importData:  List<ImportData>
+    ) : BaseAdapter() {
+
+    override fun getCount(): Int = importData.size
+
+    override fun getItemId(position: Int): Long = importData[position].id.toLong()
+
+        override fun getItem(position: Int): ImportData = importData[position]
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+            val view: View = convertView ?: LayoutInflater.from(context)
+                .inflate(R.layout.data_input, parent, false)
+
+            val data = getItem(position)
+
+            view.findViewById<TextView>(R.id.textView11).text = data.startCity
+            view.findViewById<TextView>(R.id.textView12).text = data.startCityCod
+            view.findViewById<TextView>(R.id.textView13).text = data.endCity
+            view.findViewById<TextView>(R.id.textView14).text = data.endCityCod
+            view.findViewById<TextView>(R.id.textView15).text = data.startDate
+            view.findViewById<TextView>(R.id.textView16).text = data.endDate
+            view.findViewById<TextView>(R.id.textView17).text = data.price.toString()
+            view.findViewById<TextView>(R.id.textView18).text = data.searchToken
+
+            return view
+        }
+    }
+
+data_input.xml (для инпут адаптера)
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="409dp"
+        android:layout_height="729dp"
+        android:orientation="vertical"
+        tools:layout_editor_absoluteX="1dp"
+        tools:layout_editor_absoluteY="1dp">
+
+        <TextView
+            android:id="@+id/textView11"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TextView" />
+
+        <TextView
+            android:id="@+id/textView12"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TextView" />
+
+        <TextView
+            android:id="@+id/textView13"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TextView" />
+
+        <TextView
+            android:id="@+id/textView14"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TextView" />
+
+        <TextView
+            android:id="@+id/textView15"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TextView" />
+
+        <TextView
+            android:id="@+id/textView16"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TextView" />
+
+        <TextView
+            android:id="@+id/textView17"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TextView" />
+
+        <TextView
+            android:id="@+id/textView18"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TextView" />
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>*/
