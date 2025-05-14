@@ -1,4 +1,4 @@
-Библиотеки
+/*Библиотеки
 Build.gradle.kts
 id("kotlin-kapt")
 
@@ -27,7 +27,7 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 
-/*Добавление нового MainActivity
+Добавление нового MainActivity
 <activity
             android:name=".MainActivityData"
             android:exported="false"
